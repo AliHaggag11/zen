@@ -84,6 +84,16 @@ export default function Navigation() {
                     Mood Tracker
                   </Link>
                   <Link
+                    href="/wellness"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      pathname === '/wellness'
+                        ? 'text-primary bg-primary/10'
+                        : 'text-foreground/70 hover:text-primary hover:bg-primary/5'
+                    } transition-colors`}
+                  >
+                    Activities
+                  </Link>
+                  <Link
                     href="/chat"
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
                       pathname === '/chat'

@@ -1,6 +1,52 @@
 @import "tailwindcss";
 
 :root {
+  /* Base variables that will be overridden by theme classes */
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #0D9488;
+  --secondary: #E6FAF8;
+  --accent: #14B8A6;
+}
+
+/* Theme: Calm */
+.theme-calm {
+  --background: #e6f7ff;
+  --foreground: #2c3e50;
+  --primary: #4a90e2;
+  --secondary: #b3d4fc;
+  --accent: #81b0d5;
+}
+
+/* Theme: Happy */
+.theme-happy {
+  --background: #fff9e6;
+  --foreground: #4a3f35;
+  --primary: #ffc107;
+  --secondary: #ffe082;
+  --accent: #ffcd38;
+}
+
+/* Theme: Sad */
+.theme-sad {
+  --background: #f0f0f5;
+  --foreground: #2d2d33;
+  --primary: #6c757d;
+  --secondary: #ced4da;
+  --accent: #adb5bd;
+}
+
+/* Theme: Energetic */
+.theme-energetic {
+  --background: #fff0f7;
+  --foreground: #3d2635;
+  --primary: #e83e8c;
+  --secondary: #f8c8da;
+  --accent: #f06595;
+}
+
+/* Theme: Neutral */
+.theme-neutral {
   --background: #ffffff;
   --foreground: #171717;
   --primary: #0D9488;
@@ -18,12 +64,13 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
+/* Removing dark mode preference */
+/* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
-}
+} */
 
 body {
   background: var(--background);

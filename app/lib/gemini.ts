@@ -1,69 +1,12 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
-// Initialize the Gemini API with your API key
-// In production, this would be stored in an environment variable
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || 'your-api-key-here';
-const genAI = new GoogleGenerativeAI(API_KEY);
+// Use the API key from environment variable
+const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || '';
 
-// Mental health assistant instruction prompt
-const SYSTEM_INSTRUCTION = `You are a compassionate mental health assistant named Zen. 
-Your purpose is to provide emotional support, practical advice, and resources for mental wellbeing.
+// Initialize the Google Generative AI with the API key
+const genAI = new GoogleGenerativeAI(apiKey);
 
-Guidelines:
-- Respond with empathy and understanding
-- Avoid making medical diagnoses
-- Suggest healthy coping strategies when appropriate
-- Recognize signs of serious distress and suggest professional help when needed
-- Maintain a calm, supportive tone
-- Focus on validating emotions and providing constructive guidance
-- Always maintain user privacy and confidentiality
-
-If the user is in crisis or expresses thoughts of self-harm, direct them to emergency services 
-and crisis resources.`;
-
-// Model configuration
-const MODEL_NAME = 'gemini-pro';
-
-// Define types for chat message history
-interface ChatMessage {
-  role: 'user' | 'model';
-  parts: string;
-}
-
-/**
- * Sends a message to the Gemini AI and returns the response
- * @param message - The user's message
- * @param chatHistory - Optional array of previous chat messages
- * @returns The AI response
- */
-export async function sendMessageToGemini(
-  message: string, 
-  chatHistory: ChatMessage[] = []
-): Promise<string> {
-  try {
-    // Get the generative model
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-    
-    // Add system instruction as first message if there's no history
-    let history = [...chatHistory];
-    if (history.length === 0) {
-      // We'll add the system instruction as content from the model
-      const initialMessage: ChatMessage = {
-        role: 'model',
-        parts: SYSTEM_INSTRUCTION
-      };
-      history = [initialMessage];
-    }
-    
-    // Start a chat session
-    const chat = model.startChat({
-      history,
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.7,
-        topP: 0.95,
-      },
-      safetySettings: [
+const safetySettings = [
         {
           category: HarmCategory.HARM_CATEGORY_HARASSMENT,
           threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -72,33 +15,135 @@ export async function sendMessageToGemini(
           category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
           threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
         },
-      ],
-    });
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+];
 
-    // Send message to Gemini API
-    const result = await chat.sendMessage(message);
-    const response = result.response;
+// Define the AI's system prompt and context for mental wellness
+const SYSTEM_PROMPT = `You are a compassionate and thoughtful AI mental wellness assistant named Zen. Your purpose is to provide emotional support, guidance, and evidence-based strategies to help users improve their mental well-being. 
+
+Please adhere to these guidelines:
+
+1. Prioritize empathy and understanding. Always acknowledge the user's feelings first before offering advice.
+2. Use evidence-based techniques from positive psychology, CBT, mindfulness, and other research-backed approaches.
+3. Speak in a warm, supportive voice that's conversational but professional.
+4. If someone expresses serious mental health concerns, gently encourage them to seek professional help while offering support.
+5. Suggest practical, actionable steps the user can take to address their concerns.
+6. Focus on promoting overall wellness including emotional, social, and physical health.
+7. Avoid clinical diagnoses or definitive medical advice.
+8. Respect privacy and maintain confidentiality in your responses.
+9. If a user expresses thoughts of self-harm or harm to others, emphasize the importance of reaching out to crisis services.
+
+Important: You should never claim to be a human, therapist, or licensed professional. Always make it clear you are an AI assistant designed to provide support but not replace professional care.`;
+
+interface Message {
+  sender: 'user' | 'ai';
+  text: string;
+}
+
+/**
+ * Formats chat history for the Gemini API
+ */
+export function formatChatHistory(messages: Message[]): { role: string; parts: string[] }[] {
+  // Gemini doesn't support a system role, so we'll prepend the system prompt as a model message
+  const formattedMessages: { role: string; parts: string[] }[] = [
+    { role: 'model', parts: [SYSTEM_PROMPT] }
+  ];
+
+  messages.forEach(message => {
+    formattedMessages.push({
+      role: message.sender === 'user' ? 'user' : 'model',
+      parts: [message.text]
+    });
+  });
+
+  return formattedMessages;
+}
+
+/**
+ * Sends a message to the Gemini API
+ */
+export async function sendMessageToGemini(
+  message: string, 
+  chatHistory: { role: string; parts: string[] }[] = []
+): Promise<string> {
+  if (!apiKey) {
+    console.error('Google AI API key is missing');
+    return "I'm sorry, I'm having trouble connecting. Please try again later.";
+  }
+
+  try {
+    console.log("Using API key:", apiKey ? "Present" : "Missing");
     
-    // Return the text response
-    return response.text();
+    // Get the generative model
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    // Create a simplified context with instructions to avoid asterisks
+    let prompt = `You are a compassionate mental wellness assistant named Zen. 
+                Provide a helpful, empathetic response to the following message.
+                
+                IMPORTANT FORMATTING RULES:
+                - Do not use asterisks (*) in your response
+                - Do not use markdown formatting
+                - Use simple, clean text
+                - Keep responses concise but thoughtful
+                - Use clear paragraph breaks for readability
+                - When listing items, use numbers (1, 2, 3) instead of bullets
+                
+                User message: ${message}`;
+
+    console.log("Sending prompt to Gemini API...");
+    
+    // Generate content with simple prompt approach for Gemini 2.0 Flash
+    const result = await model.generateContent(prompt);
+    console.log("Got result from API");
+    
+    // Get the response text and clean it if needed
+    let response = result.response.text();
+    // Additional cleaning to remove any remaining asterisks
+    response = response.replace(/\*/g, '');
+    
+    return response;
   } catch (error) {
-    console.error('Error calling Gemini API:', error);
-    throw new Error('Failed to get response from AI assistant');
+    console.error('Error communicating with Gemini API:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', error.message);
+    }
+    return "I'm sorry, I'm having trouble processing your request. Please try again later.";
   }
 }
 
 /**
- * Converts our app's chat format to Gemini API format
- * @param history - Array of chat messages in app format
- * @returns Array of messages in Gemini API format
+ * Saves chat messages to Supabase
  */
-export function formatChatHistory(
-  history: Array<{ sender: 'user' | 'ai'; text: string }>
-): ChatMessage[] {
-  return history.map(msg => ({
-    role: msg.sender === 'user' ? 'user' : 'model',
-    parts: msg.text
-  }));
+export async function saveChatMessage(message: {
+  user_id: string;
+  chat_session_id: string;
+  content: string;
+  is_from_user: boolean;
+}) {
+  try {
+    const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs');
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase.from('chat_messages').insert([message]);
+    
+    if (error) {
+      console.error('Error saving chat message:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in saveChatMessage:', error);
+    return null;
+  }
 }
 
 /**
@@ -108,36 +153,22 @@ export function formatChatHistory(
  */
 export async function analyzeEmotion(text: string): Promise<any> {
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
     const prompt = `
-    Analyze the emotional content of the following text. Identify:
-    1. Primary emotion (e.g., happiness, sadness, anger, fear, etc.)
-    2. Emotional intensity (scale of 1-5)
-    3. Key emotional triggers mentioned
-    
-    Return the analysis as a JSON object with the following structure:
-    {
-      "primaryEmotion": string,
-      "intensity": number,
-      "triggers": string[],
-      "summary": string
-    }
+    Analyze the emotional content of the following text. Identify the primary emotion and intensity.
     
     Text to analyze: "${text}"
     `;
     
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const analysisText = response.text();
+    const response = result.response.text();
     
-    // Extract the JSON from the response
-    const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    
-    throw new Error('Could not parse emotion analysis results');
+    // Return the text analysis directly
+    return {
+      analysis: response,
+      text: text
+    };
   } catch (error) {
     console.error('Error analyzing emotion:', error);
     throw new Error('Failed to analyze emotional content');
@@ -155,7 +186,7 @@ export async function getWellbeingSuggestions(context: {
   preferredActivities?: string[]
 }): Promise<string[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
     let moodContext = '';
     if (context.recentMoods && context.recentMoods.length > 0) {
@@ -177,22 +208,33 @@ export async function getWellbeingSuggestions(context: {
     Based on the following user context, provide 5 personalized suggestions for improving mental well-being:
     ${moodContext}${interestsContext}${activitiesContext}
     
-    Provide the suggestions as a JSON array of strings.
+    Format each suggestion as a separate line with a number.
     `;
     
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const suggestionsText = response.text();
+    const response = result.response.text();
     
-    // Extract the JSON array from the response
-    const jsonMatch = suggestionsText.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
+    // Split the response into lines and filter empty lines
+    const suggestions = response
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && /^\d/.test(line))
+      .map(line => line.replace(/^\d+[\.\)]\s*/, ''));
     
-    throw new Error('Could not parse wellbeing suggestions');
+    return suggestions.length > 0 ? suggestions : 
+      ["Take a short walk outside", 
+       "Practice deep breathing for 5 minutes", 
+       "Write down three things you're grateful for", 
+       "Connect with a friend or family member", 
+       "Listen to music that improves your mood"];
   } catch (error) {
     console.error('Error getting wellbeing suggestions:', error);
-    throw new Error('Failed to generate wellbeing suggestions');
+    return [
+      "Take a short walk outside", 
+      "Practice deep breathing for 5 minutes", 
+      "Write down three things you're grateful for", 
+      "Connect with a friend or family member", 
+      "Listen to music that improves your mood"
+    ];
   }
 } 

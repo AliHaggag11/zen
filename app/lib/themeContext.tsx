@@ -8,6 +8,7 @@ interface ThemeContextType {
   currentTheme: MoodTheme;
   setTheme: (theme: MoodTheme) => void;
   setThemeBasedOnMood: (moodLevel: number) => void;
+  setMood: (mood: MoodTheme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -42,6 +43,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setCurrentTheme(theme);
     // Set theme CSS variables on the document root
     applyTheme(theme);
+  };
+  
+  // Direct mood setter (added for ThemeButton)
+  const setMood = (mood: MoodTheme) => {
+    setCurrentTheme(mood);
+    applyTheme(mood);
   };
 
   // Apply theme whenever it changes
@@ -99,10 +106,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty('--primary', selectedTheme.primary);
     root.style.setProperty('--secondary', selectedTheme.secondary);
     root.style.setProperty('--accent', selectedTheme.accent);
+    
+    // Also add the theme class for additional CSS
+    root.classList.remove('theme-calm', 'theme-happy', 'theme-sad', 'theme-energetic', 'theme-neutral');
+    root.classList.add(`theme-${theme}`);
   };
 
   return (
-    <ThemeContext.Provider value={{ currentTheme, setTheme, setThemeBasedOnMood }}>
+    <ThemeContext.Provider value={{ currentTheme, setTheme, setThemeBasedOnMood, setMood }}>
       {children}
     </ThemeContext.Provider>
   );

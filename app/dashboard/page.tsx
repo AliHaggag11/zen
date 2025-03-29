@@ -1,137 +1,107 @@
 'use client';
 
-import { useState } from 'react';
-import MoodTracker from '../components/ui/MoodTracker';
-import { useTheme } from '../lib/themeContext';
+import { useState, useEffect } from 'react';
+import { ThemeButton } from '../components/ui/ThemeButton';
+import Card from '../components/ui/Card';
+import Link from 'next/link';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import UserWellnessReport from '../components/ui/UserWellnessReport';
+import { User } from '@supabase/supabase-js';
 
 export default function Dashboard() {
-  const [selectedMood, setSelectedMood] = useState<number | null>(null);
-  const { currentTheme, setThemeBasedOnMood } = useTheme();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClientComponentClient();
   
-  const handleMoodSelected = (moodLevel: number) => {
-    setSelectedMood(moodLevel);
-    setThemeBasedOnMood(moodLevel);
-  };
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
+      setLoading(false);
+    };
+    
+    getUser();
+  }, [supabase]);
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-12">
-          <h1 className="text-4xl font-bold text-foreground mb-8">Dashboard</h1>
+      <main className="min-h-screen p-6 bg-background">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+              <p className="text-foreground/70">Welcome to your mental wellness dashboard</p>
+            </div>
+            <ThemeButton />
+          </div>
           
-          <section className="mb-12">
-            <h2 className="text-2xl font-semibold text-foreground mb-6">How are you feeling today?</h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              <MoodTracker 
-                onMoodSelected={handleMoodSelected}
-              />
-              
-              <div className="bg-primary/5 rounded-lg p-8 border border-primary/10">
-                <h3 className="text-xl font-medium text-foreground mb-4">Theme Customization</h3>
-                <p className="text-foreground/80 mb-6">
-                  This dashboard demonstrates the dynamic theme system. As you select different moods, 
-                  the interface adapts to create an environment that resonates with how you feel.
-                </p>
-                
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-foreground/70">Current Theme:</span>
-                      <span className="font-medium text-primary capitalize">{currentTheme}</span>
+          {/* Dashboard content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* User Wellness Report - Takes 2/3 of the space on larger screens */}
+            <div className="lg:col-span-2">
+              <UserWellnessReport user={user} />
+            </div>
+            
+            {/* Quick Actions Panel */}
+            <div className="space-y-6">
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+                <div className="space-y-3">
+                  <Link href="/chat" className="flex items-center p-3 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors">
+                    <div className="p-2 bg-primary rounded-full mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                      </svg>
                     </div>
-                    <div className="h-2 bg-background rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-300"
-                        style={{ width: selectedMood ? `${(selectedMood / 5) * 100}%` : '60%' }}
-                      ></div>
+                    <div>
+                      <h3 className="font-medium">Chat with Zen AI</h3>
+                      <p className="text-sm text-foreground/70">Talk about your thoughts and feelings</p>
                     </div>
-                  </div>
+                  </Link>
                   
-                  <p className="text-sm text-foreground/60">
-                    {currentTheme === 'calm' && 'The calm theme uses cool blues and gentle gradients to create a soothing experience.'}
-                    {currentTheme === 'happy' && 'The happy theme uses bright, warm colors to enhance your positive mood.'}
-                    {currentTheme === 'sad' && 'The sad theme offers softer, comforting colors to provide gentle support.'}
-                    {currentTheme === 'energetic' && 'The energetic theme uses vibrant colors to match your high energy level.'}
-                    {currentTheme === 'neutral' && 'The neutral theme uses balanced colors for a calm, focused experience.'}
-                  </p>
+                  <Link href="/profile" className="flex items-center p-3 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors">
+                    <div className="p-2 bg-primary rounded-full mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Update Profile</h3>
+                      <p className="text-sm text-foreground/70">Manage your account settings</p>
+                    </div>
+                  </Link>
+                  
+                  <button className="w-full flex items-center p-3 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors">
+                    <div className="p-2 bg-primary rounded-full mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Wellness Activities</h3>
+                      <p className="text-sm text-foreground/70">Coming soon</p>
+                    </div>
+                  </button>
                 </div>
-              </div>
-            </div>
-          </section>
-          
-          <section className="grid md:grid-cols-3 gap-8">
-            <div className="bg-background rounded-lg p-8 shadow-md border border-primary/10">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-medium text-foreground">Recent Activity</h3>
-                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">New</span>
-              </div>
+              </Card>
               
-              <ul className="space-y-4">
-                <li className="border-b border-primary/10 pb-4">
-                  <p className="text-foreground font-medium">Mood tracked</p>
-                  <p className="text-foreground/60 text-sm">Today at 9:30 AM</p>
-                </li>
-                <li className="border-b border-primary/10 pb-4">
-                  <p className="text-foreground font-medium">Completed breathing exercise</p>
-                  <p className="text-foreground/60 text-sm">Yesterday at 8:15 PM</p>
-                </li>
-                <li>
-                  <p className="text-foreground font-medium">Updated profile</p>
-                  <p className="text-foreground/60 text-sm">2 days ago</p>
-                </li>
-              </ul>
-            </div>
-            
-            <div className="bg-background rounded-lg p-8 shadow-md border border-primary/10">
-              <h3 className="text-xl font-medium text-foreground mb-6">Mood Insights</h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-foreground/70">Weekly Average</span>
-                    <span className="font-medium text-primary">3.8/5</span>
-                  </div>
-                  <div className="h-2 bg-background rounded-full overflow-hidden">
-                    <div className="h-full bg-primary w-3/4"></div>
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-foreground/70">Monthly Trend</span>
-                    <span className="font-medium text-green-500">↑ 12%</span>
-                  </div>
-                  <div className="h-2 bg-background rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 w-4/5"></div>
-                  </div>
-                </div>
-                
-                <p className="text-sm text-foreground/60">
-                  Your mood has been improving over the past 30 days. Keep up the good work!
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Mood Themes</h2>
+                <p className="text-sm text-foreground/70 mb-4">
+                  Change the app theme based on your current mood
                 </p>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <ThemeButton mood="calm" />
+                  <ThemeButton mood="happy" />
+                  <ThemeButton mood="sad" />
+                  <ThemeButton mood="energetic" />
+                </div>
+              </Card>
             </div>
-            
-            <div className="bg-background rounded-lg p-8 shadow-md border border-primary/10">
-              <h3 className="text-xl font-medium text-foreground mb-6">Recommended</h3>
-              
-              <ul className="space-y-4">
-                <li className="border-b border-primary/10 pb-4">
-                  <p className="text-foreground font-medium">5-Minute Meditation</p>
-                  <p className="text-foreground/60 text-sm">Quick relaxation technique</p>
-                </li>
-                <li className="border-b border-primary/10 pb-4">
-                  <p className="text-foreground font-medium">Gratitude Journal</p>
-                  <p className="text-foreground/60 text-sm">Record things you're thankful for</p>
-                </li>
-                <li>
-                  <p className="text-foreground font-medium">Evening Reflection</p>
-                  <p className="text-foreground/60 text-sm">Review your day with mindfulness</p>
-                </li>
-              </ul>
-            </div>
-          </section>
+          </div>
         </div>
       </main>
     </ProtectedRoute>
