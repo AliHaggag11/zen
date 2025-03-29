@@ -641,46 +641,149 @@ export class UserAnalysisService {
     try {
       analysis.last_updated = new Date().toISOString();
       
+      // Ensure wellness_score is a valid number
+      if (analysis.wellness_score !== undefined) {
+        analysis.wellness_score = Math.min(10, Math.max(1, Math.round(analysis.wellness_score)));
+      }
+      
       // Check if record exists first
       const { data: existingRecord, error: checkError } = await this.supabase
         .from('user_analysis')
         .select('id')
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', userId);
       
       if (checkError) {
-        if (checkError.code === 'PGRST116') {
-          // Record doesn't exist, create it
-          const { data, error } = await this.supabase
-            .from('user_analysis')
-            .insert({
-              ...analysis,
-              user_id: userId
-            })
-            .select()
-            .single();
-          
-          if (error) throw error;
-          return data as UserAnalysis;
-        } else {
-          throw checkError;
+        console.error('Error checking if user analysis exists:', checkError);
+        throw checkError;
+      }
+      
+      // Create a copy of the analysis to avoid mutation problems
+      const analysisCopy = { ...analysis };
+      
+      if (!existingRecord || existingRecord.length === 0) {
+        // Record doesn't exist, create it
+        console.log('Creating new user analysis record');
+        const { data, error } = await this.supabase
+          .from('user_analysis')
+          .insert({
+            ...analysisCopy,
+            user_id: userId
+          })
+          .select();
+        
+        if (error) {
+          console.error('Error inserting user analysis:', error);
+          throw error;
         }
+        
+        return data && data.length > 0 ? data[0] as UserAnalysis : null;
       }
       
       // Record exists, update it
+      console.log('Updating existing user analysis record');
       const { data, error } = await this.supabase
         .from('user_analysis')
-        .update(analysis)
+        .update(analysisCopy)
         .eq('user_id', userId)
-        .select()
-        .single();
+        .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating user analysis:', error);
+        throw error;
+      }
       
-      return data as UserAnalysis;
+      return data && data.length > 0 ? data[0] as UserAnalysis : null;
     } catch (error) {
       console.error('Error updating user analysis:', error);
-      return null;
+      
+      // Return the original analysis as fallback
+      return {
+        user_id: userId,
+        mood_trends: analysis.mood_trends || {},
+        common_topics: analysis.common_topics || [],
+        wellness_score: analysis.wellness_score || 5,
+        strengths: analysis.strengths || [],
+        areas_for_growth: analysis.areas_for_growth || [],
+        recommended_practices: analysis.recommended_practices || [{
+          title: "Daily Mindfulness",
+          description: "Start with 5 minutes of mindfulness meditation each day.",
+          frequency: "Daily"
+        }],
+        last_updated: new Date().toISOString()
+      };
+    }
+  }
+  
+  /**
+   * Gets a user's wellness activities
+   */
+  async getUserActivities(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_activities')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting user activities:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Calculate activity contribution to wellness score
+   */
+  calculateActivityScore(activities: any[]): number {
+    // If no activities, no contribution
+    if (!activities || activities.length === 0) return 0;
+    
+    try {
+      // Calculate activity score based on completions and streaks
+      let activityScore = 0;
+      
+      // Count completed activities
+      const completedCount = activities.filter(a => a.completed).length;
+      
+      // Calculate total streak days safely
+      const totalStreak = activities.reduce((sum, activity) => {
+        const streak = activity.streak || 0;
+        // Ensure we're adding a valid number
+        return sum + (isNaN(streak) ? 0 : streak);
+      }, 0);
+      
+      // Get highest streak safely
+      const highestStreak = activities.reduce((max, activity) => {
+        const streak = activity.streak || 0;
+        return Math.max(max, isNaN(streak) ? 0 : streak);
+      }, 0);
+      
+      // Award points for completions (max 1.5 points)
+      activityScore += Math.min(1.5, completedCount * 0.3);
+      
+      // Award points for total streaks (max 1 point)
+      activityScore += Math.min(1, totalStreak * 0.05);
+      
+      // Award bonus for high streaks (max 0.5 points)
+      activityScore += Math.min(0.5, highestStreak * 0.1);
+      
+      // Award points for activity variety (max 1 point)
+      const uniqueActivitiesCompleted = new Set(
+        activities.filter(a => a.completed && a.title).map(a => a.title)
+      ).size;
+      activityScore += Math.min(1, uniqueActivitiesCompleted * 0.2);
+      
+      // Cap the total contribution at 3 points
+      const finalScore = Math.min(3, activityScore);
+      
+      console.log(`Activity score contribution: ${finalScore.toFixed(2)} (${completedCount} completed, ${totalStreak} total streak days, ${highestStreak} highest streak, ${uniqueActivitiesCompleted} unique activities)`);
+      
+      return finalScore;
+    } catch (err) {
+      console.error('Error calculating activity score:', err);
+      // Return a safe default value
+      return 0;
     }
   }
   
@@ -691,6 +794,10 @@ export class UserAnalysisService {
     try {
       // Get user messages
       const messages = await this.getUserChatHistory(userId);
+      
+      // Get user activities
+      const activities = await this.getUserActivities(userId);
+      console.log(`Found ${activities.length} activities for user ${userId}`);
       
       // Get existing analysis
       let existingAnalysis = await this.getUserAnalysis(userId);
@@ -715,8 +822,21 @@ export class UserAnalysisService {
         };
       }
       
+      // Calculate activity score contribution
+      const activityScore = this.calculateActivityScore(activities);
+      console.log(`Activity score contribution for user ${userId}: ${activityScore}`);
+      
       if (!messages || messages.length === 0) {
-        // No messages yet, just return the default or existing analysis
+        // Even with no messages, calculate score based on activities
+        if (activities.length > 0) {
+          // If we have activities but no messages, use a base score plus activity contribution
+          existingAnalysis.wellness_score = Math.min(10, Math.max(1, 5 + activityScore));
+          existingAnalysis.last_updated = new Date().toISOString();
+          console.log(`Updating wellness score based on activities only: ${existingAnalysis.wellness_score}`);
+          return await this.updateUserAnalysis(userId, existingAnalysis);
+        }
+        
+        // No messages or activities, just return the default or existing analysis
         return existingAnalysis;
       }
       
@@ -724,7 +844,29 @@ export class UserAnalysisService {
       const analysisResults = await this.analyzeUserMessages(messages);
       
       if (!analysisResults) {
+        // If analysis fails but we have activities, adjust existing score
+        if (activities.length > 0) {
+          existingAnalysis.wellness_score = Math.min(10, Math.max(1, existingAnalysis.wellness_score + activityScore));
+          existingAnalysis.last_updated = new Date().toISOString();
+          console.log(`Updating existing wellness score with activities: ${existingAnalysis.wellness_score}`);
+          return await this.updateUserAnalysis(userId, existingAnalysis);
+        }
         return existingAnalysis;
+      }
+      
+      // Start with message-based score
+      let wellnessScore = analysisResults.wellness_score;
+      
+      // Include activity data in wellness score calculation
+      if (activities.length > 0) {
+        // Base the new score on the sentiment analysis but boost it with activity data
+        // Limit the maximum contribution to ensure balance
+        wellnessScore = Math.min(10, Math.max(1, wellnessScore + activityScore));
+        
+        // Update the wellness score in the results
+        analysisResults.wellness_score = wellnessScore;
+        
+        console.log(`Final wellness score including activities: ${wellnessScore}`);
       }
       
       // Merge with existing analysis

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type MoodTheme = 'calm' | 'happy' | 'sad' | 'energetic' | 'neutral';
+type MoodTheme = 'serene' | 'joyful' | 'reflective' | 'vibrant' | 'balanced';
 
 interface ThemeContextType {
   currentTheme: MoodTheme;
@@ -14,28 +14,28 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [currentTheme, setCurrentTheme] = useState<MoodTheme>('neutral');
+  const [currentTheme, setCurrentTheme] = useState<MoodTheme>('balanced');
 
   // Map mood levels (1-5) to theme types
   const setThemeBasedOnMood = (moodLevel: number) => {
     switch (moodLevel) {
       case 1: // Very Low
-        setCurrentTheme('sad');
+        setCurrentTheme('reflective');
         break;
       case 2: // Low
-        setCurrentTheme('calm');
+        setCurrentTheme('serene');
         break;
       case 3: // Neutral
-        setCurrentTheme('neutral');
+        setCurrentTheme('balanced');
         break;
       case 4: // Good
-        setCurrentTheme('happy');
+        setCurrentTheme('joyful');
         break;
       case 5: // Excellent
-        setCurrentTheme('energetic');
+        setCurrentTheme('vibrant');
         break;
       default:
-        setCurrentTheme('neutral');
+        setCurrentTheme('balanced');
     }
   };
 
@@ -61,40 +61,40 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     
     const themes = {
-      calm: {
-        background: '#e6f7ff',
-        foreground: '#2c3e50',
-        primary: '#4a90e2',
-        secondary: '#b3d4fc',
-        accent: '#81b0d5'
+      serene: {
+        background: '#edf6fc',
+        foreground: '#2c4356',
+        primary: '#62a7db',
+        secondary: '#c7e2f5',
+        accent: '#3a89c9'
       },
-      happy: {
-        background: '#fff9e6',
-        foreground: '#4a3f35',
-        primary: '#ffc107',
-        secondary: '#ffe082',
-        accent: '#ffcd38'
+      joyful: {
+        background: '#fff8ed',
+        foreground: '#553d2c',
+        primary: '#ffb347',
+        secondary: '#ffe7c1',
+        accent: '#ffa126'
       },
-      sad: {
-        background: '#f0f0f5',
-        foreground: '#2d2d33',
-        primary: '#6c757d',
-        secondary: '#ced4da',
-        accent: '#adb5bd'
+      reflective: {
+        background: '#f5f5fa',
+        foreground: '#2a2c3d',
+        primary: '#7b8cde',
+        secondary: '#dce0f9',
+        accent: '#5c6bc0'
       },
-      energetic: {
-        background: '#fff0f7',
-        foreground: '#3d2635',
-        primary: '#e83e8c',
-        secondary: '#f8c8da',
-        accent: '#f06595'
+      vibrant: {
+        background: '#fef4f8',
+        foreground: '#4d2d3c',
+        primary: '#f56fa1',
+        secondary: '#fcdaeb',
+        accent: '#ec407a'
       },
-      neutral: {
-        background: '#ffffff',
-        foreground: '#171717',
-        primary: '#0D9488', // Teal color from the MoodTracker component
-        secondary: '#E6FAF8',
-        accent: '#14B8A6'
+      balanced: {
+        background: '#f9fefe',
+        foreground: '#1a3b39',
+        primary: '#26a69a',
+        secondary: '#e0f2f1',
+        accent: '#00897b'
       }
     };
 
@@ -107,9 +107,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty('--secondary', selectedTheme.secondary);
     root.style.setProperty('--accent', selectedTheme.accent);
     
+    // Map the new theme names to old ones for backward compatibility
+    const classMapping: Record<MoodTheme, string> = {
+      serene: 'calm',
+      joyful: 'happy',
+      reflective: 'sad',
+      vibrant: 'energetic',
+      balanced: 'neutral'
+    };
+    
     // Also add the theme class for additional CSS
     root.classList.remove('theme-calm', 'theme-happy', 'theme-sad', 'theme-energetic', 'theme-neutral');
-    root.classList.add(`theme-${theme}`);
+    root.classList.add(`theme-${classMapping[theme]}`);
   };
 
   return (

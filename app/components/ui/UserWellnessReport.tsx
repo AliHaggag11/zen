@@ -44,13 +44,29 @@ export default function UserWellnessReport({ user, className = '' }: UserWellnes
       
       // Generate fresh analysis
       const service = new UserAnalysisService();
-      const userAnalysis = await service.analyzeAndUpdateUserProfile(user.id);
+      console.log('Analyzing user profile for wellness report...');
+      
+      let userAnalysis: UserAnalysis | null = null;
+      
+      try {
+        userAnalysis = await service.analyzeAndUpdateUserProfile(user.id);
+        console.log('Analysis completed successfully:', userAnalysis?.wellness_score);
+      } catch (analysisError) {
+        console.error('Error in analysis:', analysisError);
+        // Try to get existing analysis without updating
+        try {
+          userAnalysis = await service.getUserAnalysis(user.id);
+          console.log('Retrieved existing analysis as fallback');
+        } catch (getError) {
+          console.error('Could not retrieve existing analysis:', getError);
+        }
+      }
       
       if (userAnalysis) {
         setAnalysis(userAnalysis);
       } else {
         // If null is returned, use a default analysis
-        setAnalysis({
+        const defaultAnalysis = {
           user_id: user.id,
           mood_trends: {},
           common_topics: [],
@@ -63,7 +79,15 @@ export default function UserWellnessReport({ user, className = '' }: UserWellnes
             frequency: "Daily"
           }],
           last_updated: new Date().toISOString()
-        });
+        };
+        
+        setAnalysis(defaultAnalysis);
+        // Try to save this default analysis to avoid future errors
+        try {
+          await service.updateUserAnalysis(user.id, defaultAnalysis);
+        } catch (saveError) {
+          console.error('Could not save default analysis:', saveError);
+        }
       }
     } catch (e) {
       console.error('Error loading user analysis:', e);
@@ -219,6 +243,12 @@ export default function UserWellnessReport({ user, className = '' }: UserWellnes
             </p>
           </div>
         </div>
+        <p className="text-xs text-foreground/70 mt-2 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          Score includes your completed wellness activities and streaks
+        </p>
       </div>
       
       {/* Mood Trends */}

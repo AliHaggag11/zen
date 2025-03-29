@@ -11,6 +11,7 @@ import MindfulnessExercise from '../components/ui/MindfulnessExercise';
 import { User } from '@supabase/supabase-js';
 import { useTheme } from '../lib/themeContext';
 import VideoModal from '../components/ui/VideoModal';
+import MindfulMovementCard from '../components/ui/MindfulMovementCard';
 
 interface Activity {
   id: string;
@@ -202,10 +203,12 @@ export default function WellnessActivitiesPage() {
       
       // Calculate new streak
       let newStreak = activity.streak;
+      let wasCompleted = false;  // Track whether the activity was marked as completed
       
       if (lastCompleted === today) {
         // Already completed today, toggle off
         newStreak = Math.max(0, newStreak - 1);
+        wasCompleted = false;
         
         await supabase
           .from('user_activities')
@@ -239,6 +242,8 @@ export default function WellnessActivitiesPage() {
           newStreak = 1;
         }
         
+        wasCompleted = true;
+        
         await supabase
           .from('user_activities')
           .update({
@@ -253,6 +258,40 @@ export default function WellnessActivitiesPage() {
             ? { ...a, completed: true, streak: newStreak, lastCompleted: new Date().toISOString() } 
             : a
         ));
+      }
+      
+      // Update wellness score after activity completion
+      if (user) {
+        try {
+          // Wait a short moment to ensure database is updated
+          setTimeout(async () => {
+            try {
+              // Trigger wellness score recalculation
+              const service = new UserAnalysisService();
+              console.log('Recalculating wellness score after activity completion...');
+              const updatedAnalysis = await service.analyzeAndUpdateUserProfile(user.id);
+              
+              if (updatedAnalysis) {
+                setAnalysis(updatedAnalysis);
+                console.log('Wellness score updated:', updatedAnalysis.wellness_score);
+                
+                // Show a temporary success message
+                const actionText = wasCompleted ? 'completed' : 'uncompleted';
+                setError(`Activity ${actionText}! Your wellness score is now ${updatedAnalysis.wellness_score}.`);
+                
+                // Clear message after a few seconds
+                setTimeout(() => {
+                  setError(null);
+                }, 3000);
+              }
+            } catch (e) {
+              console.error('Error updating wellness score:', e);
+              setError('Activity updated, but there was a problem updating your wellness score.');
+            }
+          }, 500);
+        } catch (e) {
+          console.error('Error scheduling wellness score update:', e);
+        }
       }
     } catch (e) {
       console.error('Error updating activity:', e);
@@ -368,6 +407,7 @@ export default function WellnessActivitiesPage() {
 
   // Function to open video modal
   const openVideoModal = (videoUrl: string, title: string) => {
+    console.log('Opening video modal with:', { videoUrl, title });
     setCurrentVideo({ url: videoUrl, title });
     setVideoModalOpen(true);
   };
@@ -380,6 +420,15 @@ export default function WellnessActivitiesPage() {
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">Wellness Activities</h1>
               <p className="text-foreground/70">Track your wellness practices and build healthy habits</p>
+              <p className="text-foreground/70 text-sm mt-1">
+                <span className="inline-flex items-center bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs mr-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  New
+                </span>
+                Completed activities now boost your wellness score!
+              </p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
@@ -576,62 +625,29 @@ export default function WellnessActivitiesPage() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-                    <div 
-                      className="border border-primary/10 rounded-lg p-4 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
-                      onClick={() => {
-                        openVideoModal('https://www.youtube.com/embed/cEOS2zoyQw4', 'Tai Chi for Beginners');
-                        console.log('Opening Tai Chi video');
-                      }}
-                    >
-                      <h4 className="font-medium mb-2 text-center">Tai Chi</h4>
-                      <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3 relative group">
-                        <div className="absolute inset-0 bg-primary/10 group-hover:bg-primary/20 transition-colors rounded-md flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <p className="text-sm text-foreground/70">Slow, flowing movements with focused breathing to promote harmony and balance.</p>
-                    </div>
+                    <MindfulMovementCard 
+                      title="Tai Chi"
+                      description="Slow, flowing movements with focused breathing to promote harmony and balance."
+                      videoUrl="https://www.youtube.com/embed/cEOS2zoyQw4?enablejsapi=1"
+                      videoTitle="Tai Chi for Beginners"
+                      onVideoClick={openVideoModal}
+                    />
                     
-                    <div 
-                      className="border border-primary/10 rounded-lg p-4 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
-                      onClick={() => {
-                        openVideoModal('https://www.youtube.com/embed/Ac3mhgHpQQ0', 'Qigong for Beginners');
-                        console.log('Opening Qigong video');
-                      }}
-                    >
-                      <h4 className="font-medium mb-2 text-center">Qigong</h4>
-                      <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3 relative group">
-                        <div className="absolute inset-0 bg-primary/10 group-hover:bg-primary/20 transition-colors rounded-md flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <p className="text-sm text-foreground/70">Coordinated body postures, movement, breathing, and meditation to enhance life energy.</p>
-                    </div>
+                    <MindfulMovementCard 
+                      title="Qigong"
+                      description="Coordinated body postures, movement, breathing, and meditation to enhance life energy."
+                      videoUrl="https://www.youtube.com/embed/Ac3mhgHpQQ0?enablejsapi=1"
+                      videoTitle="Qigong for Beginners"
+                      onVideoClick={openVideoModal}
+                    />
                     
-                    <div 
-                      className="border border-primary/10 rounded-lg p-4 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
-                      onClick={() => {
-                        openVideoModal('https://www.youtube.com/embed/VaoV1PrYft4', 'Gentle Yoga for Beginners');
-                        console.log('Opening Yoga video');
-                      }}
-                    >
-                      <h4 className="font-medium mb-2 text-center">Yoga</h4>
-                      <div className="aspect-video bg-gray-100 rounded-md flex items-center justify-center mb-3 relative group">
-                        <div className="absolute inset-0 bg-primary/10 group-hover:bg-primary/20 transition-colors rounded-md flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <p className="text-sm text-foreground/70">Postures, meditation, and breathing techniques to promote physical and mental wellbeing.</p>
-                    </div>
+                    <MindfulMovementCard 
+                      title="Yoga"
+                      description="Postures, meditation, and breathing techniques to promote physical and mental wellbeing."
+                      videoUrl="https://www.youtube.com/embed/VaoV1PrYft4?enablejsapi=1"
+                      videoTitle="Gentle Yoga for Beginners"
+                      onVideoClick={openVideoModal}
+                    />
                   </div>
                   
                   <div className="mt-6 max-w-lg mx-auto">

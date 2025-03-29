@@ -1,5 +1,6 @@
 import React from 'react';
 import Card from '../../components/ui/Card';
+import { cn } from '@/app/lib/utils';
 
 interface JournalEntryProps {
   id: string;
@@ -34,17 +35,68 @@ export default function JournalEntry({
     });
   };
   
+  const getMoodColor = (mood?: string) => {
+    if (!mood) return { bg: 'bg-primary/80', pill: 'bg-primary/10 text-primary' };
+    
+    const lowerMood = mood.toLowerCase();
+    
+    if (lowerMood.includes('reflective') || lowerMood.includes('sad')) {
+      return { 
+        bg: 'bg-[#7b8cde]', 
+        pill: 'bg-[#dce0f9] text-[#5c6bc0]',
+        emoji: '🤔'
+      };
+    }
+    
+    if (lowerMood.includes('serene') || lowerMood.includes('calm')) {
+      return { 
+        bg: 'bg-[#62a7db]', 
+        pill: 'bg-[#c7e2f5] text-[#3a89c9]',
+        emoji: '😌'
+      };
+    }
+    
+    if (lowerMood.includes('balanced') || lowerMood.includes('neutral')) {
+      return { 
+        bg: 'bg-[#26a69a]', 
+        pill: 'bg-[#e0f2f1] text-[#00897b]',
+        emoji: '😊'
+      };
+    }
+    
+    if (lowerMood.includes('joyful') || lowerMood.includes('happy')) {
+      return { 
+        bg: 'bg-[#ffb347]', 
+        pill: 'bg-[#ffe7c1] text-[#ffa126]',
+        emoji: '😄'
+      };
+    }
+    
+    if (lowerMood.includes('vibrant') || lowerMood.includes('energetic')) {
+      return { 
+        bg: 'bg-[#f56fa1]', 
+        pill: 'bg-[#fcdaeb] text-[#ec407a]',
+        emoji: '🤩'
+      };
+    }
+    
+    return { bg: 'bg-primary/80', pill: 'bg-primary/10 text-primary' };
+  };
+  
+  const moodColors = getMoodColor(mood);
+  
   return (
     <Card className="mb-6 p-0 overflow-hidden">
       <div className="relative">
-        {/* Colored top bar, could be customized based on mood */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-primary/80"></div>
+        {/* Colored top bar, customized based on mood */}
+        <div className={cn("absolute top-0 left-0 w-full h-1", moodColors.bg)}></div>
         
         <div className="p-6">
           <div className="flex justify-between items-start mb-4">
             <h3 className="text-lg font-semibold">{title}</h3>
             {mood && (
-              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+              <span className={cn("text-xs px-2 py-1 rounded-full flex items-center", moodColors.pill)}>
+                {moodColors.emoji && <span className="mr-1">{moodColors.emoji}</span>}
                 {mood}
               </span>
             )}
@@ -88,7 +140,7 @@ export default function JournalEntry({
           </div>
           
           {tags && tags.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-3 pt-3 border-t border-foreground/10">
               <div className="flex flex-wrap gap-1">
                 {tags.map((tag, i) => (
                   <span key={i} className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs">

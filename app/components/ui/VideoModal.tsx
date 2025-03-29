@@ -12,16 +12,23 @@ interface VideoModalProps {
 
 export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  
+  // Debug logs
+  useEffect(() => {
+    console.log('VideoModal props:', { isOpen, videoUrl, title });
+  }, [isOpen, videoUrl, title]);
 
   // Close modal when clicking outside content
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        console.log('Clicked outside modal, closing');
         onClose();
       }
     };
 
     if (isOpen) {
+      console.log('Adding click outside listener');
       document.addEventListener('mousedown', handleClickOutside);
     }
 
@@ -34,11 +41,13 @@ export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoMo
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        console.log('Escape key pressed, closing modal');
         onClose();
       }
     };
 
     if (isOpen) {
+      console.log('Adding escape key listener');
       document.addEventListener('keydown', handleKeyDown);
     }
 
@@ -66,7 +75,10 @@ export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoMo
             <div className="flex justify-between items-center bg-primary/5 p-4 border-b border-primary/10">
               <h2 className="text-xl font-semibold text-foreground">{title}</h2>
               <button 
-                onClick={onClose}
+                onClick={() => {
+                  console.log('Close button clicked');
+                  onClose();
+                }}
                 className="p-1 hover:bg-primary/10 rounded-full"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-foreground/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,14 +88,16 @@ export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoMo
             </div>
             <div className="p-4">
               <div className="aspect-video relative bg-black rounded-md overflow-hidden">
-                <iframe 
-                  src={`${videoUrl}?autoplay=1`} 
-                  className="w-full h-full"
-                  title={title}
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  frameBorder="0"
-                ></iframe>
+                <div className="w-full h-full">
+                  <iframe 
+                    src={`${videoUrl}?autoplay=1&rel=0`} 
+                    className="absolute top-0 left-0 w-full h-full"
+                    title={title}
+                    allowFullScreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    frameBorder="0"
+                  ></iframe>
+                </div>
               </div>
             </div>
           </motion.div>

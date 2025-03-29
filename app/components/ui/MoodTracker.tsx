@@ -4,34 +4,30 @@ import { useState } from 'react';
 import { cn } from '@/app/lib/utils';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/app/lib/themeContext';
-
-interface MoodOption {
-  value: number;
-  label: string;
-  emoji: string;
-  description: string;
-}
+import { MoodLevel, MOOD_DATA } from '@/app/lib/types';
 
 interface MoodTrackerProps {
   className?: string;
-  onMoodSelected?: (moodValue: number) => void;
+  onMoodSelected?: (moodValue: MoodLevel) => void;
+  selectedMood?: MoodLevel;
+  hideDescription?: boolean;
 }
 
-export default function MoodTracker({ className, onMoodSelected }: MoodTrackerProps) {
-  const [selectedMood, setSelectedMood] = useState<number | null>(null);
-  const [hoveredMood, setHoveredMood] = useState<number | null>(null);
+export default function MoodTracker({ 
+  className, 
+  onMoodSelected,
+  selectedMood: externalSelectedMood,
+  hideDescription = false
+}: MoodTrackerProps) {
+  const [internalSelectedMood, setInternalSelectedMood] = useState<MoodLevel | null>(null);
+  const [hoveredMood, setHoveredMood] = useState<MoodLevel | null>(null);
   const { setThemeBasedOnMood } = useTheme();
 
-  const moodOptions: MoodOption[] = [
-    { value: 1, label: 'Very Sad', emoji: '😢', description: 'Feeling down or upset' },
-    { value: 2, label: 'Sad', emoji: '😔', description: 'Not in the best mood' },
-    { value: 3, label: 'Neutral', emoji: '😐', description: 'Neither happy nor sad' },
-    { value: 4, label: 'Happy', emoji: '😊', description: 'Feeling good today' },
-    { value: 5, label: 'Very Happy', emoji: '😁', description: 'Feeling great!' },
-  ];
+  // Use external selected mood if provided, otherwise use internal state
+  const selectedMood = externalSelectedMood !== undefined ? externalSelectedMood : internalSelectedMood;
 
-  const handleMoodSelect = (moodValue: number) => {
-    setSelectedMood(moodValue);
+  const handleMoodSelect = (moodValue: MoodLevel) => {
+    setInternalSelectedMood(moodValue);
     setThemeBasedOnMood(moodValue);
     
     if (onMoodSelected) {
@@ -39,41 +35,30 @@ export default function MoodTracker({ className, onMoodSelected }: MoodTrackerPr
     }
   };
 
+  // Create dynamic styles based on the mood value
+  const getMoodColor = (value: MoodLevel) => {
+    const mood = MOOD_DATA[value];
+    return `from-[${mood.color}]/20 to-[${mood.color}]/20 border-[${mood.lightColor}] hover:bg-[${mood.lightColor}]/50`;
+  };
+
   return (
-    <div className={cn('bg-background rounded-lg shadow-md p-8 border border-primary/10', className)}>
-      <div className="mb-6 text-center">
-        <h3 className="text-2xl font-bold text-foreground mb-2">How are you feeling today?</h3>
-        <p className="text-foreground/70">Select your mood to personalize your experience</p>
-      </div>
-
+    <div className={cn('bg-background rounded-lg border border-primary/10', className)}>
       <div className="flex flex-col items-stretch space-y-3">
-        {moodOptions.map((mood) => {
+        {Object.values(MOOD_DATA).map((mood) => {
           // Determine if this mood is selected or hovered
-          const isSelected = selectedMood === mood.value;
-          const isHovered = hoveredMood === mood.value;
+          const isSelected = selectedMood === mood.level;
+          const isHovered = hoveredMood === mood.level;
           
-          // Create dynamic styles based on the mood value
-          const getMoodColor = (value: number) => {
-            switch (value) {
-              case 1: return 'from-blue-500/20 to-indigo-500/20 border-blue-200 hover:bg-blue-50';
-              case 2: return 'from-indigo-500/20 to-purple-500/20 border-indigo-200 hover:bg-indigo-50';
-              case 3: return 'from-purple-500/20 to-violet-500/20 border-purple-200 hover:bg-purple-50';
-              case 4: return 'from-amber-500/20 to-orange-500/20 border-amber-200 hover:bg-amber-50';
-              case 5: return 'from-orange-500/20 to-red-500/20 border-orange-200 hover:bg-orange-50';
-              default: return 'from-gray-200 to-gray-100 border-gray-200 hover:bg-gray-50';
-            }
-          };
-
           return (
             <motion.button
-              key={mood.value}
-              onClick={() => handleMoodSelect(mood.value)}
-              onMouseEnter={() => setHoveredMood(mood.value)}
+              key={mood.level}
+              onClick={() => handleMoodSelect(mood.level)}
+              onMouseEnter={() => setHoveredMood(mood.level)}
               onMouseLeave={() => setHoveredMood(null)}
               className={cn(
                 'relative flex items-center p-4 rounded-lg cursor-pointer transition-all duration-300 bg-gradient-to-r border',
                 isSelected ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-primary/50',
-                getMoodColor(mood.value)
+                `from-[${mood.color}]/20 to-[${mood.color}]/10 border-[${mood.lightColor}] hover:bg-[${mood.lightColor}]/50`
               )}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -81,7 +66,7 @@ export default function MoodTracker({ className, onMoodSelected }: MoodTrackerPr
               <div className="flex items-center w-full">
                 <div className="flex-shrink-0 text-2xl mr-4">{mood.emoji}</div>
                 <div className="flex-grow">
-                  <div className="font-medium">{mood.label}</div>
+                  <div className="font-medium">{mood.name}</div>
                   <div className="text-sm text-foreground/70">{mood.description}</div>
                 </div>
                 <div className="flex-shrink-0 ml-2">
@@ -102,15 +87,11 @@ export default function MoodTracker({ className, onMoodSelected }: MoodTrackerPr
               {/* Visual feedback for the mood - progress bar */}
               <div className="absolute bottom-0 left-0 right-0 h-1 rounded-b-lg overflow-hidden">
                 <div 
-                  className={cn(
-                    "h-full transition-all duration-300",
-                    mood.value === 1 ? "bg-blue-500" : 
-                    mood.value === 2 ? "bg-indigo-500" :
-                    mood.value === 3 ? "bg-purple-500" :
-                    mood.value === 4 ? "bg-amber-500" :
-                    "bg-orange-500"
-                  )}
-                  style={{ width: `${(mood.value / 5) * 100}%` }}
+                  className="h-full transition-all duration-300"
+                  style={{ 
+                    width: `${(mood.level / 5) * 100}%`,
+                    backgroundColor: mood.color
+                  }}
                 ></div>
               </div>
             </motion.button>
@@ -118,15 +99,19 @@ export default function MoodTracker({ className, onMoodSelected }: MoodTrackerPr
         })}
       </div>
 
-      {selectedMood !== null && (
+      {!hideDescription && selectedMood !== null && (
         <div className="mt-6 pt-4 border-t border-foreground/10">
-          <h4 className="font-medium text-foreground mb-2">Your selected mood: {moodOptions.find(m => m.value === selectedMood)?.label}</h4>
+          <h4 className="font-medium text-foreground mb-2">Your selected mood: {MOOD_DATA[selectedMood].name}</h4>
           <p className="text-sm text-foreground/70">
-            {selectedMood <= 2 
-              ? "We've adjusted your experience to provide a calming environment. Take care of yourself today." 
-              : selectedMood === 3 
-                ? "Our neutral theme provides a balanced experience while you navigate the app." 
-                : "We've brightened things up to match your positive mood. Enjoy your experience!"}
+            {selectedMood === 1 
+              ? "We've adjusted your experience to a reflective environment. Take time to process your thoughts today." 
+              : selectedMood === 2 
+                ? "Our serene theme provides a peaceful atmosphere to help you find tranquility." 
+                : selectedMood === 3 
+                  ? "The balanced theme creates a harmonious experience as you use the app."
+                  : selectedMood === 4
+                    ? "We've brightened things up to match your joyful mood. Enjoy your experience!"
+                    : "Our vibrant theme enhances your energetic state. Make the most of your momentum!"}
           </p>
         </div>
       )}
