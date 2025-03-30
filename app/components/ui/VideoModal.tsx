@@ -13,22 +13,15 @@ interface VideoModalProps {
 export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   
-  // Debug logs
-  useEffect(() => {
-    console.log('VideoModal props:', { isOpen, videoUrl, title });
-  }, [isOpen, videoUrl, title]);
-
   // Close modal when clicking outside content
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        console.log('Clicked outside modal, closing');
         onClose();
       }
     };
 
     if (isOpen) {
-      console.log('Adding click outside listener');
       document.addEventListener('mousedown', handleClickOutside);
     }
 
@@ -41,13 +34,11 @@ export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoMo
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        console.log('Escape key pressed, closing modal');
         onClose();
       }
     };
 
     if (isOpen) {
-      console.log('Adding escape key listener');
       document.addEventListener('keydown', handleKeyDown);
     }
 
@@ -70,35 +61,37 @@ export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoMo
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 20, opacity: 0 }}
-            className="bg-background rounded-lg overflow-hidden w-full max-w-4xl shadow-xl"
+            className="bg-white rounded-lg overflow-hidden w-full max-w-4xl shadow-2xl"
           >
-            <div className="flex justify-between items-center bg-primary/5 p-4 border-b border-primary/10">
-              <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+            <div className="flex justify-between items-center p-5 border-b border-gray-100">
+              <h2 className="text-xl font-medium text-gray-800">{title}</h2>
               <button 
-                onClick={() => {
-                  console.log('Close button clicked');
-                  onClose();
-                }}
-                className="p-1 hover:bg-primary/10 rounded-full"
+                onClick={onClose}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                aria-label="Close"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-foreground/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="p-4">
-              <div className="aspect-video relative bg-black rounded-md overflow-hidden">
-                <div className="w-full h-full">
-                  <iframe 
-                    src={`${videoUrl}?autoplay=1&rel=0`} 
-                    className="absolute top-0 left-0 w-full h-full"
-                    title={title}
-                    allowFullScreen
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    frameBorder="0"
-                  ></iframe>
-                </div>
+            <div className="p-5">
+              <div className="aspect-video bg-black rounded-md overflow-hidden shadow-inner">
+                <iframe 
+                  src={`${videoUrl}?autoplay=1&rel=0`} 
+                  className="w-full h-full"
+                  title={title}
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  frameBorder="0"
+                ></iframe>
               </div>
+            </div>
+            <div className="px-5 pb-5 pt-1">
+              <p className="text-sm text-gray-500">
+                This video demonstrates proper technique for maximum benefit. 
+                Follow along at your own pace and modify as needed.
+              </p>
             </div>
           </motion.div>
         </motion.div>

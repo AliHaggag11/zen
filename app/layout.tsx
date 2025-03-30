@@ -3,6 +3,7 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./lib/themeContext";
 import Navigation from "./components/ui/Navigation";
+import { SupabaseProvider } from "./lib/supabase/provider";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -25,10 +26,12 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} antialiased mood-theme-transition`}
       >
-        <ThemeProvider>
-          <Navigation />
-          {children}
-        </ThemeProvider>
+        <SupabaseProvider>
+          <ThemeProvider>
+            <Navigation />
+            {children}
+          </ThemeProvider>
+        </SupabaseProvider>
       </body>
     </html>
   );
