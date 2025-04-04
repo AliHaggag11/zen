@@ -61,19 +61,42 @@ export default function ChatPage() {
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Reset current chat session first
+      setChatSessionId(null);
+      
+      // Create new chat session
+      const { data: newChat, error } = await supabase
         .from('chat_sessions')
         .insert({
           user_id: userId,
           title: 'New Chat ' + new Date().toLocaleDateString()
         })
-        .select();
+        .select()
+        .single();
       
       if (error) throw error;
       
-      if (data && data.length > 0) {
-        setChatSessionId(data[0].id);
-        await fetchChatSessions(userId);
+      if (newChat) {
+        // Update chat sessions first
+        const { data: sessions } = await supabase
+          .from('chat_sessions')
+          .select('id, title, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        
+        if (sessions) {
+          setChatSessions(sessions as ChatSession[]);
+        }
+        
+        // Then set the new chat ID after a short delay to ensure reset
+        setTimeout(() => {
+          setChatSessionId(newChat.id);
+        }, 50);
+        
+        // Close sidebar on mobile
+        if (window.innerWidth < 1024) {
+          setIsSidebarOpen(false);
+        }
       }
     } catch (error) {
       console.error('Error creating new chat session:', error);
@@ -149,26 +172,41 @@ export default function ChatPage() {
   const generateChatTitle = async (chatId: string, firstMessage: string) => {
     if (!chatId || !firstMessage) return;
     
-    // If already has a meaningful title (not "New Chat"), don't update
-    const { data: chatData } = await supabase
-      .from('chat_sessions')
-      .select('title')
-      .eq('id', chatId)
-      .single();
+    try {
+      // Get the first sentence or meaningful chunk of text
+      let title = firstMessage
+        .split(/[.!?]/) // Split by sentence endings
+        .map(s => s.trim()) // Trim whitespace
+        .filter(s => s.length > 0)[0] || // Take first non-empty sentence
+        firstMessage.split('\n')[0]; // Fallback to first line if no sentences
       
-    if (chatData && !chatData.title.startsWith('New Chat')) {
-      return;
+      // If still too long, truncate to 50 chars at word boundary
+      if (title.length > 50) {
+        title = title.substring(0, 50).split(' ').slice(0, -1).join(' ');
+      }
+      
+      // Remove any special characters and extra spaces
+      title = title.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      // Update the chat title
+      const { error } = await supabase
+        .from('chat_sessions')
+        .update({ title })
+        .eq('id', chatId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setChatSessions(prev => 
+        prev.map(session => 
+          session.id === chatId 
+            ? { ...session, title } 
+            : session
+        )
+      );
+    } catch (error) {
+      console.error('Error updating chat title:', error);
     }
-    
-    // Generate title from first message (limit to first 30 chars)
-    let title = firstMessage.length > 30 
-      ? firstMessage.substring(0, 30) + '...' 
-      : firstMessage;
-      
-    // Remove any line breaks
-    title = title.replace(/\n/g, ' ');
-    
-    await updateChatTitle(chatId, title);
   };
   
   // Analyze user chat history
@@ -387,6 +425,7 @@ export default function ChatPage() {
                 chatSessionId={chatSessionId}
                 userId={userId || undefined}
                 suggestedTopics={suggestedTopics}
+                onFirstUserMessage={(message) => generateChatTitle(chatSessionId, message)}
               />
             ) : (
               <div className="h-full flex items-center justify-center p-4">

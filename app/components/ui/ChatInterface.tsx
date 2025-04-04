@@ -52,6 +52,13 @@ export default function ChatInterface({
   const { currentTheme } = useTheme();
   const supabase = createClientComponentClient();
 
+  // Reset messages when chat session changes
+  useEffect(() => {
+    setChat([]);
+    setMessage('');
+    setIsSending(false);
+  }, [chatSessionId]);
+
   // Fetch user profile for avatar
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -149,6 +156,9 @@ export default function ChatInterface({
     setChat(prev => [...prev, newUserMessage]);
 
     try {
+      // Check if this is the first user message (no previous user messages in chat)
+      const isFirstUserMessage = !chat.some(msg => msg.sender === 'user');
+      
       // Format chat history for the API
       const formattedHistory = formatChatHistory(chat);
       
@@ -173,11 +183,11 @@ export default function ChatInterface({
           content: response,
           is_from_user: false
         });
-      }
 
-      // Call onFirstUserMessage if this is the first user message
-      if (onFirstUserMessage && chat.length === 1) {
-        onFirstUserMessage(userMessage);
+        // Call onFirstUserMessage if this is the first user message
+        if (onFirstUserMessage && isFirstUserMessage) {
+          onFirstUserMessage(userMessage);
+        }
       }
 
       // Analyze emotion if callback provided
