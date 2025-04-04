@@ -84,6 +84,11 @@ export async function sendMessageToGemini(
     // Get the generative model
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
+    // Create a prompt that includes the chat history
+    const historyText = chatHistory
+      .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.parts[0]}`)
+      .join('\n');
+
     // Create a simplified context with instructions to avoid asterisks
     let prompt = `You are a compassionate mental wellness assistant named Zen. 
                 Provide a helpful, empathetic response to the following message.
@@ -96,6 +101,7 @@ export async function sendMessageToGemini(
                 - Use clear paragraph breaks for readability
                 - When listing items, use numbers (1, 2, 3) instead of bullets
                 
+                ${historyText ? `Previous conversation:\n${historyText}\n\n` : ''}
                 User message: ${message}`;
 
     console.log("Sending prompt to Gemini API...");

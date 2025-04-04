@@ -8,6 +8,7 @@ import { Database } from '../lib/supabase/database.types';
 import { useTheme } from '../lib/themeContext';
 import Link from 'next/link';
 import { UserAnalysisService } from '../lib/services/userAnalysisService';
+import { Menu, X, Plus, Trash2, ChevronLeft } from 'lucide-react';
 
 interface ChatSession {
   id: string;
@@ -21,7 +22,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const supabase = createClientComponentClient<Database>();
@@ -101,24 +102,15 @@ export default function ChatPage() {
   };
   
   // Delete chat session
-  const deleteChatSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent selecting the chat when clicking delete
-    
-    // Open the modal and set the pending delete ID
-    setPendingDeleteId(id);
-    setDeleteModalOpen(true);
-  };
-  
-  // Confirm delete action
-  const confirmDelete = async () => {
-    if (!userId || !pendingDeleteId) return;
+  const deleteChatSession = async (id: string) => {
+    if (!userId || !id) return;
     
     try {
       // Delete all chat messages first
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
-        .eq('chat_session_id', pendingDeleteId);
+        .eq('chat_session_id', id);
       
       if (messagesError) throw messagesError;
       
@@ -126,12 +118,12 @@ export default function ChatPage() {
       const { error } = await supabase
         .from('chat_sessions')
         .delete()
-        .eq('id', pendingDeleteId);
+        .eq('id', id);
       
       if (error) throw error;
       
       // If we deleted the active chat, select another one
-      if (chatSessionId === pendingDeleteId) {
+      if (chatSessionId === id) {
         const { data } = await supabase
           .from('chat_sessions')
           .select('id')
@@ -150,17 +142,7 @@ export default function ChatPage() {
       await fetchChatSessions(userId);
     } catch (error) {
       console.error('Error deleting chat session:', error);
-    } finally {
-      // Close the modal and clear the pending delete ID
-      setDeleteModalOpen(false);
-      setPendingDeleteId(null);
     }
-  };
-  
-  // Cancel delete action
-  const cancelDelete = () => {
-    setDeleteModalOpen(false);
-    setPendingDeleteId(null);
   };
   
   // Function to generate a title from the first message
@@ -283,163 +265,167 @@ export default function ChatPage() {
     });
   };
   
+  // Add this effect to handle mobile sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) { // lg breakpoint
+        setIsSidebarOpen(true);
+      }
+    };
+
+    handleResize(); // Initial check
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-background flex relative">
-        {/* Chat History Sidebar - Modified for mobile overlay */}
-        <div className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed md:relative h-full z-30 md:z-auto md:translate-x-0 md:w-80 w-[85vw] bg-background border-r border-primary/10 transition-all duration-300 overflow-hidden shadow-lg md:shadow-none`}>
-          <div className="p-4 border-b border-primary/10">
-            <div className="flex items-center justify-between">
-              <button 
-                onClick={createNewChatSession}
-                className="w-full py-3 px-4 bg-primary text-white rounded-lg flex items-center justify-center space-x-2 hover:bg-primary/90 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <span>New Chat</span>
-              </button>
-              <button 
-                className="md:hidden ml-2 p-2 rounded-md hover:bg-primary/10 transition-colors"
+      <div className="flex h-screen bg-background">
+        {/* Mobile Sidebar Toggle */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-primary/10 text-primary lg:hidden"
+          aria-label="Toggle sidebar"
+        >
+          {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        {/* Backdrop */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <div 
+          className={`fixed lg:static inset-y-0 left-0 z-40 w-72 bg-background border-r border-primary/10 transform transition-transform duration-300 ease-in-out ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
+        >
+          <div className="flex flex-col h-full">
+            {/* Sidebar Header with close button */}
+            <div className="p-4 border-b border-primary/10 flex items-center justify-between">
+              <h1 className="text-xl font-semibold text-foreground">Chat Sessions</h1>
+              <button
                 onClick={() => setIsSidebarOpen(false)}
+                className="lg:hidden p-2 rounded-lg hover:bg-primary/5 text-foreground"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                <X size={20} />
               </button>
             </div>
-          </div>
-          
-          <div className="overflow-y-auto h-[calc(100vh-5rem)]">
-            {chatSessions.map((session) => (
-              <div 
-                key={session.id} 
-                onClick={() => {
-                  setChatSessionId(session.id);
-                  if (userId) {
-                    // Trigger analysis when a chat is selected
-                    analyzeUserChat(userId);
-                  }
-                }}
-                className={`p-4 border-b border-primary/5 cursor-pointer hover:bg-primary/5 transition-colors ${
-                  chatSessionId === session.id ? 'bg-primary/10' : ''
-                }`}
+
+            {/* Rest of the sidebar content */}
+            <div className="p-4">
+              <button
+                onClick={createNewChatSession}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start flex-1 min-w-0 mr-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary flex-shrink-0 mt-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                    </svg>
-                    <div className="ml-3 flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{formatSessionTitle(session)}</p>
-                      <p className="text-xs text-foreground/60">{formatSessionDate(session.created_at)}</p>
-                    </div>
-                  </div>
+                <Plus size={20} />
+                New Chat
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {chatSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                    chatSessionId === session.id
+                      ? 'bg-primary/10 text-primary'
+                      : 'hover:bg-primary/5'
+                  }`}
+                >
                   <button
-                    onClick={(e) => deleteChatSession(session.id, e)}
-                    className="p-1.5 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors"
-                    title="Delete chat"
+                    onClick={() => {
+                      setChatSessionId(session.id);
+                      setIsSidebarOpen(false);
+                    }}
+                    className="flex-1 text-left truncate"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
+                    {session.title}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDeleteId(session.id);
+                      setDeleteModalOpen(true);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-foreground/50 hover:text-foreground transition-opacity"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col">
+          {/* Mobile Header */}
+          <div className="lg:hidden p-4 border-b border-primary/10">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 rounded-lg hover:bg-primary/5"
+              >
+                <Menu size={24} />
+              </button>
+              <h2 className="text-lg font-semibold text-foreground truncate">
+                {chatSessions.find(s => s.id === chatSessionId)?.title || 'New Chat'}
+              </h2>
+            </div>
+          </div>
+
+          {/* Chat Interface */}
+          <div className="flex-1">
+            {chatSessionId ? (
+              <ChatInterface
+                chatSessionId={chatSessionId}
+                userId={userId || undefined}
+                suggestedTopics={suggestedTopics}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center p-4">
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Welcome to Zen Chat</h2>
+                  <p className="text-foreground/70 mb-4">Start a new chat or select an existing one from the sidebar</p>
+                  <button
+                    onClick={createNewChatSession}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    Start New Chat
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Backdrop for mobile - closes sidebar when clicking outside */}
-        {isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/30 z-20 md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          ></div>
-        )}
-        
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col min-h-screen">
-          <div className="sticky top-0 z-10 bg-background border-b border-primary/10 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center">
-              <button 
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="mr-3 p-2 rounded-md hover:bg-primary/10 transition-colors md:hidden"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-foreground" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-              <h1 className="text-xl font-semibold text-foreground">Zen AI Chat</h1>
-            </div>
-            <div>
-              <button
-                onClick={createNewChatSession}
-                className="p-2 rounded-md hover:bg-primary/10 transition-colors text-foreground"
-                title="New Chat"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex-1 p-4">
-            {error && (
-              <div className="mb-8 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
-                <p className="font-medium">Error</p>
-                <p>{error}</p>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                >
-                  Try Again
-                </button>
-              </div>
             )}
-            
-            <div className="h-full max-w-5xl mx-auto">
-              {isLoading ? (
-                <div className="flex justify-center items-center h-96 bg-background rounded-lg shadow">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                </div>
-              ) : !error && chatSessionId ? (
-                <ChatInterface 
-                  chatSessionId={chatSessionId}
-                  userId={userId || undefined}
-                  className="h-full"
-                  suggestedTopics={suggestedTopics}
-                  onTopicSelect={handleTopicSelection}
-                  onFirstUserMessage={(message) => generateChatTitle(chatSessionId, message)}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-96 bg-background rounded-lg shadow">
-                  <p className="text-foreground/70">Unable to load chat. Please try again later.</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
-        
+
         {/* Delete Confirmation Modal */}
         {deleteModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-primary/20">
-              <h3 className="text-lg font-medium mb-4">Delete Chat</h3>
-              <p className="mb-6 text-foreground/80">
-                Are you sure you want to delete this chat? This action cannot be undone.
-              </p>
-              <div className="flex justify-end gap-3">
+            <div className="bg-background p-6 rounded-xl max-w-sm w-full mx-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Delete Chat</h3>
+              <p className="text-foreground/70 mb-6">Are you sure you want to delete this chat? This action cannot be undone.</p>
+              <div className="flex justify-end gap-4">
                 <button
-                  onClick={cancelDelete}
-                  className="px-4 py-2 rounded-md border border-primary/20 hover:bg-primary/5 transition-colors"
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="px-4 py-2 text-foreground hover:bg-primary/5 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors"
+                  onClick={() => {
+                    if (pendingDeleteId) {
+                      deleteChatSession(pendingDeleteId);
+                    }
+                    setDeleteModalOpen(false);
+                  }}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                 >
                   Delete
                 </button>
@@ -447,7 +433,7 @@ export default function ChatPage() {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </ProtectedRoute>
   );
 } 

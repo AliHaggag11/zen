@@ -7,6 +7,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { UserAnalysisService } from '../../lib/services/userAnalysisService';
 import { getProfile } from '../../lib/supabase/profiles';
 import Image from 'next/image';
+import AnimatedMessage from './AnimatedMessage';
 
 interface Message {
   sender: 'user' | 'ai';
@@ -14,14 +15,15 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  chatSessionId?: string;
-  userId?: string;
+  chatSessionId: string;
+  userId: string | null | undefined;
   initialMessages?: Message[];
   onAnalyzeEmotion?: (text: string) => void;
   className?: string;
   suggestedTopics?: string[];
   onTopicSelect?: (topic: string) => void;
   onFirstUserMessage?: (message: string) => void;
+  onEmotionAnalysis?: (emotion: string) => void;
 }
 
 export default function ChatInterface({
@@ -36,7 +38,8 @@ export default function ChatInterface({
     "I need to improve my sleep habits"
   ],
   onTopicSelect,
-  onFirstUserMessage
+  onFirstUserMessage,
+  onEmotionAnalysis
 }: ChatInterfaceProps) {
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState<Message[]>(initialMessages);
@@ -134,79 +137,65 @@ export default function ChatInterface({
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || isSending) return;
 
-    // Hide suggestions after first message
+    const userMessage = message.trim();
+    setMessage('');
+    setIsSending(true);
     setShowSuggestions(false);
 
     // Add user message to chat
-    const userMessage: Message = { sender: 'user', text: message };
-    
-    // If this is the first user message, call the callback
-    const isFirstUserMessage = chat.every(msg => msg.sender !== 'user');
-    if (isFirstUserMessage && onFirstUserMessage) {
-      onFirstUserMessage(message);
-    }
-    
-    setChat(prevChat => [...prevChat, userMessage]);
-    const currentMessage = message; // Save message before clearing input
-    setMessage('');
-    setIsSending(true);
-    
+    const newUserMessage = { sender: 'user' as const, text: userMessage };
+    setChat(prev => [...prev, newUserMessage]);
+
     try {
-      // Store message in database if we have a session ID
+      // Format chat history for the API
+      const formattedHistory = formatChatHistory(chat);
+      
+      // Send message to Gemini with chat history
+      const response = await sendMessageToGemini(userMessage, formattedHistory);
+      
+      // Add AI response to chat
+      const newAIMessage = { sender: 'ai' as const, text: response };
+      setChat(prev => [...prev, newAIMessage]);
+
+      // Save messages to database if we have a chat session
       if (chatSessionId && userId) {
         await saveChatMessage({
           user_id: userId,
           chat_session_id: chatSessionId,
-          content: currentMessage,
+          content: userMessage,
           is_from_user: true
         });
-      }
-      
-      // Get formatted chat history for the API
-      const formattedHistory = formatChatHistory(chat);
-      
-      // Send message to Gemini API
-      const response = await sendMessageToGemini(currentMessage, formattedHistory);
-      
-      // Add AI response to chat
-      const aiMessage: Message = { sender: 'ai', text: response };
-      setChat(prevChat => [...prevChat, aiMessage]);
-      
-      // Store AI response in database if we have a session ID
-      if (chatSessionId && userId) {
         await saveChatMessage({
           user_id: userId,
           chat_session_id: chatSessionId,
           content: response,
           is_from_user: false
         });
-        
-        // Trigger user analysis update after a short delay
-        setTimeout(async () => {
-          try {
-            const analysisService = new UserAnalysisService();
-            await analysisService.analyzeAndUpdateUserProfile(userId);
-          } catch (error) {
-            console.error('Error updating user analysis:', error);
-          }
-        }, 2000);
       }
-      
-      // Analyze emotion in the user's message
+
+      // Call onFirstUserMessage if this is the first user message
+      if (onFirstUserMessage && chat.length === 1) {
+        onFirstUserMessage(userMessage);
+      }
+
+      // Analyze emotion if callback provided
       if (onAnalyzeEmotion) {
-        onAnalyzeEmotion(currentMessage);
+        onAnalyzeEmotion(userMessage);
+      }
+
+      // Analyze emotion of the response
+      if (onEmotionAnalysis) {
+        onEmotionAnalysis(response);
       }
     } catch (error) {
-      console.error('Error getting AI response:', error);
-      setChat(prevChat => [
-        ...prevChat, 
-        { 
-          sender: 'ai', 
-          text: 'I apologize, but I encountered an error. Please try again later.' 
-        }
-      ]);
+      console.error('Error sending message:', error);
+      // Add error message to chat
+      setChat(prev => [...prev, { 
+        sender: 'ai', 
+        text: "I'm sorry, I'm having trouble processing your message. Please try again." 
+      }]);
     } finally {
       setIsSending(false);
     }
@@ -283,36 +272,56 @@ export default function ChatInterface({
     <div className={`flex flex-col bg-background rounded-xl shadow-lg border border-primary/10 overflow-hidden ${className}`} style={{ height: 'calc(100vh - 10rem)' }}>
       <div className="flex-grow overflow-y-auto" ref={chatContainerRef}>
         <div className="p-6 space-y-6">
-          {chat.map((msg, index) => (
-            <div 
-              key={index}
-              className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {/* Avatar for AI */}
-              {msg.sender === 'ai' && (
-                <div className="mr-2 self-end mb-1">
-                  {renderAIAvatar()}
-                </div>
-              )}
-              
+          {chat.map((msg, index) => {
+            const isMostRecentAI = msg.sender === 'ai' && index === chat.length - 1;
+            
+            return (
               <div 
-                className={`px-4 py-3 rounded-2xl max-w-[75%] ${
-                  msg.sender === 'user' 
-                    ? 'bg-primary text-white rounded-tr-none' 
-                    : 'bg-primary/5 text-foreground rounded-tl-none border border-primary/5'
-                }`}
+                key={index}
+                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className="whitespace-pre-wrap text-sm sm:text-base">{msg.text}</div>
-              </div>
-              
-              {/* Avatar for User */}
-              {msg.sender === 'user' && (
-                <div className="ml-2 self-end mb-1">
-                  {renderUserAvatar()}
+                {/* Avatar for AI */}
+                {msg.sender === 'ai' && (
+                  <div className="mr-2 self-end mb-1">
+                    {renderAIAvatar()}
+                  </div>
+                )}
+                
+                <div 
+                  className={`px-4 py-3 rounded-2xl max-w-[75%] ${
+                    msg.sender === 'user' 
+                      ? 'bg-primary text-white rounded-tr-none' 
+                      : 'bg-primary/5 text-foreground rounded-tl-none border border-primary/5'
+                  }`}
+                >
+                  {msg.sender === 'ai' ? (
+                    isMostRecentAI ? (
+                      <AnimatedMessage 
+                        text={msg.text} 
+                        speed={20}
+                        className="text-foreground"
+                      />
+                    ) : (
+                      <div className="whitespace-pre-wrap text-sm sm:text-base text-foreground">
+                        {msg.text}
+                      </div>
+                    )
+                  ) : (
+                    <div className="whitespace-pre-wrap text-sm sm:text-base text-white">
+                      {msg.text}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                
+                {/* Avatar for User */}
+                {msg.sender === 'user' && (
+                  <div className="ml-2 self-end mb-1">
+                    {renderUserAvatar()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           
           {isSending && (
             <div className="flex justify-start">
@@ -351,7 +360,7 @@ export default function ChatInterface({
         </div>
       </div>
       
-      <div className="p-4 border-t border-primary/10">
+      <div className="p-4 border-t border-primary/10 sticky bottom-0 bg-background pb-20 md:pb-4">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <div className="flex-grow relative">
             <textarea
