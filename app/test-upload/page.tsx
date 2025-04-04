@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import Image from 'next/image';
 
 export default function TestUpload() {
   const [file, setFile] = useState<File | null>(null);
@@ -69,9 +70,9 @@ export default function TestUpload() {
       
       setResult('File uploaded successfully!');
       setImageUrl(urlData.publicUrl);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Unexpected error:', error);
-      setError(`Error: ${error.message || 'Unknown error'}`);
+      setError(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -123,9 +124,11 @@ export default function TestUpload() {
                 <div className="mt-6">
                   <h3 className="text-lg font-medium mb-2">Uploaded Image:</h3>
                   <div className="bg-gray-100 p-4 rounded-lg">
-                    <img 
+                    <Image 
                       src={imageUrl} 
                       alt="Uploaded" 
+                      width={192}
+                      height={192}
                       className="max-h-48 mx-auto"
                     />
                     <p className="mt-2 text-sm text-center text-foreground/70">

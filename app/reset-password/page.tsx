@@ -13,7 +13,6 @@ export default function ResetPassword() {
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const { currentTheme } = useTheme();
 
   useEffect(() => {
     // Check if we have a session (which means the user clicked the reset link)
@@ -59,8 +58,8 @@ export default function ResetPassword() {
       setTimeout(() => {
         router.push('/login');
       }, 2000);
-    } catch (error: any) {
-      setError(error.message || 'Failed to reset password');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to reset password');
     } finally {
       setLoading(false);
     }

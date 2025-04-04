@@ -33,8 +33,8 @@ export default function VerificationSent() {
       }
 
       setResendSuccess(true);
-    } catch (error: any) {
-      setResendError(error.message || 'Failed to resend verification email');
+    } catch (error: unknown) {
+      setResendError(error instanceof Error ? error.message : 'Failed to resend verification email');
     } finally {
       setIsResending(false);
     }
@@ -92,7 +92,7 @@ export default function VerificationSent() {
 
         <div className="mt-6 text-sm text-foreground/50">
           <p>
-            If you don't see the email, check your spam folder or{' '}
+            If you don&apos;t see the email, check your spam folder or{' '}
             <Link href="/contact" className="text-primary hover:text-primary/80">
               contact support
             </Link>

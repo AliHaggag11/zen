@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { UserAnalysis } from '../lib/services/userAnalysisService';
 import { UserAnalysisService } from '../lib/services/userAnalysisService';
@@ -38,22 +38,8 @@ export default function WellnessActivitiesPage() {
   const supabase = createClientComponentClient();
   const { currentTheme } = useTheme();
 
-  // Load user data
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await loadUserData(session.user.id);
-      }
-      setLoading(false);
-    };
-    
-    getUser();
-  }, [supabase]);
-
   // Load user analysis and activities
-  const loadUserData = async (userId: string) => {
+  const loadUserData = useCallback(async (userId: string) => {
     try {
       setLoading(true);
       // Get user analysis
@@ -188,7 +174,21 @@ export default function WellnessActivitiesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load user data
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        await loadUserData(session.user.id);
+      }
+      setLoading(false);
+    };
+    
+    getUser();
+  }, [supabase, loadUserData]);
 
   // Mark activity as complete
   const completeActivity = async (activityId: string) => {
