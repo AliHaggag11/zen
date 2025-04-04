@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useTheme } from '../lib/themeContext';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useSearchParams } from 'next/navigation';
 
-export default function VerificationSent() {
+function VerificationContent() {
   const { currentTheme } = useTheme();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
@@ -57,7 +57,7 @@ export default function VerificationSent() {
         <h1 className="text-2xl font-bold text-foreground">Verification Email Sent</h1>
         
         <p className="text-foreground/70">
-          We've sent a verification email to <span className="font-medium text-primary">{email}</span>.
+          We&apos;ve sent a verification email to <span className="font-medium text-primary">{email}</span>.
           Please check your inbox and click the link to verify your account.
         </p>
 
@@ -101,5 +101,13 @@ export default function VerificationSent() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerificationSent() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <VerificationContent />
+    </Suspense>
   );
 } 
